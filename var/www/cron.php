@@ -26,7 +26,8 @@ while($id=$stmt->fetch(PDO::FETCH_NUM)){
 	$reload[$firstchar]=true;
 	$enable_onion->execute([$id[6]]);
 	//add and manage rights of system user
-	exec('useradd -l -p ' . escapeshellarg($id[2]) . ' -g www-data -k /var/www/skel -m -s /usr/sbin/nologin ' . escapeshellarg($system_account));
+	$shell = ENABLE_SHELL_ACCESS ? '/bin/bash' : '/usr/sbin/nologin';
+	exec('useradd -l -p ' . escapeshellarg($id[2]) . ' -g www-data -k /var/www/skel -m -s ' . escapeshellarg($shell) . ' ' . escapeshellarg($system_account));
 	exec('/var/www/setup_chroot.sh  ' . escapeshellarg("/home/$system_account"));
 	exec('grep ' . escapeshellarg($system_account) . ' /etc/passwd >> ' . escapeshellarg("/home/$system_account/etc/passwd"));
 	foreach(['.ssh', 'data', 'Maildir'] as $dir){
@@ -98,6 +99,12 @@ foreach($onions as $onion){
 	$firstchar=substr($onion[0], 0, 1);
 	$reload[$firstchar]=true;
 	if(file_exists("/var/lib/tor-instances/$firstchar/hidden_service_$onion[0].onion/")){
+		if(file_exists("/var/lib/tor-instances/$firstchar/hidden_service_$onion[0].onion/authorized_clients/")){
+			foreach(glob("/var/lib/tor-instances/$firstchar/hidden_service_$onion[0].onion/authorized_clients/*") as $file){
+				unlink($file);
+			}
+			rmdir("/var/lib/tor-instances/$firstchar/hidden_service_$onion[0].onion/authorized_clients");
+		}
 		foreach(glob("/var/lib/tor-instances/$firstchar/hidden_service_$onion[0].onion/*") as $file){
 			unlink($file);
 		}

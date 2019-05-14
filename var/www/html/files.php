@@ -101,7 +101,7 @@ if(!empty($_REQUEST['path'])){
 	$dir=str_replace('..', '\.\.', $dir);
 	$dir=preg_replace('~//+~', '/', $dir);
 }else{
-	$dir='/';
+	$dir='/www/';
 }
 if(@!ftp_chdir($ftp, $dir)){
 	$dir=rtrim($dir, '/');
@@ -125,34 +125,52 @@ if(@!ftp_chdir($ftp, $dir)){
 }
 
 if(!empty($_POST['mkdir']) && !empty($_POST['name'])){
-		ftp_mkdir($ftp, $_POST['name']);
+	if($error=check_csrf_error()){
+		die($error);
+	}
+	ftp_mkdir($ftp, $_POST['name']);
 }
 
 if(!empty($_POST['mkfile']) && !empty($_POST['name'])){
-		$tmpfile='/tmp/'.uniqid();
-		touch($tmpfile);
-		ftp_put($ftp, $_POST['name'], $tmpfile, FTP_BINARY);
-		unlink($tmpfile);
+	if($error=check_csrf_error()){
+		die($error);
+	}
+	$tmpfile='/tmp/'.uniqid();
+	touch($tmpfile);
+	ftp_put($ftp, $_POST['name'], $tmpfile, FTP_BINARY);
+	unlink($tmpfile);
 }
 
 if(!empty($_POST['delete']) && !empty($_POST['files'])){
+	if($error=check_csrf_error()){
+		die($error);
+	}
 	foreach($_POST['files'] as $file){
 		ftp_recursive_delete($ftp, $file);
 	}
 }
 
 if(!empty($_POST['rename_2']) && !empty($_POST['files'])){
+	if($error=check_csrf_error()){
+		die($error);
+	}
 	foreach($_POST['files'] as $old=>$new){
 		ftp_rename($ftp, $old, $new);
 	}
 }
 
 if(!empty($_POST['rename']) && !empty($_POST['files'])){
+	if($error=check_csrf_error()){
+		die($error);
+	}
 	send_rename($dir);
 	exit;
 }
 
 if(!empty($_POST['edit_2']) && !empty($_POST['files'])){
+	if($error=check_csrf_error()){
+		die($error);
+	}
 	$tmpfile='/tmp/'.uniqid();
 	foreach($_POST['files'] as $name=>$content){
 		file_put_contents($tmpfile, $content);
@@ -162,11 +180,17 @@ if(!empty($_POST['edit_2']) && !empty($_POST['files'])){
 }
 
 if(!empty($_POST['edit']) && !empty($_POST['files'])){
+	if($error=check_csrf_error()){
+		die($error);
+	}
 	send_edit($ftp, $dir);
 	exit;
 }
 
 if(!empty($_POST['unzip']) && !empty($_POST['files'])){
+	if($error=check_csrf_error()){
+		die($error);
+	}
 	$zip = new ZipArchive();
 	foreach($_POST['files'] as $file){
 		if(!preg_match('/\.zip$/', $file)){
@@ -202,6 +226,9 @@ if(!empty($_POST['unzip']) && !empty($_POST['files'])){
 
 
 if(!empty($_FILES['files'])){
+	if($error=check_csrf_error()){
+		die($error);
+	}
 	$c=count($_FILES['files']['name']);
 	for($i=0; $i<$c; ++$i){
 		if($_FILES['files']['error'][$i]===UPLOAD_ERR_OK){
@@ -276,7 +303,7 @@ $dir=htmlspecialchars($dir);
 </head><body>
 <h1>Index of <?php echo $dir; ?></h1>
 <?php if($dir!=='/'){ ?>
-<p>Upload up to 1GB and up to 100 files at once <form action="files.php" enctype="multipart/form-data" method="post"><input name="files[]" type="file" multiple><input type="hidden" name="path" value="<?php echo $dir; ?>"><input type="submit" value="Upload"></form></p><br>
+<p>Upload up to 1GB and up to 100 files at once <form action="files.php" enctype="multipart/form-data" method="post"><input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>"><input name="files[]" type="file" multiple><input type="hidden" name="path" value="<?php echo $dir; ?>"><input type="submit" value="Upload"></form></p><br>
 <?php
 }
 $fileurl='A';
@@ -294,6 +321,7 @@ if($order==='A'){
 }
 ?>
 <form action="files.php" method="post">
+<input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
 <input type="submit" name="mkdir" value="Create directory">
 <input type="submit" name="mkfile" value="Create file">
 <input type="text" name="name"><br><br>
@@ -309,11 +337,11 @@ if($order==='A'){
 <th><a href="files.php?path=<?php echo $dir; ?>&amp;C=S&amp;O=<?php echo $sizeurl; ?>">Size</a></th>
 </tr>
 <tr><td colspan="4"><hr></td></tr>
-<tr><td></td><td class="back"></td><td colspan="3"><a href="files.php?path=<?php echo substr($dir, 0, strrpos(rtrim($dir, '/'), '/'))."/&amp;C=$sort&amp;O=$order"?>">Parent Directory</a></td></tr>
+<tr><td id="checkAllParent"></td><td class="back"></td><td colspan="3"><a href="files.php?path=<?php echo substr($dir, 0, strrpos(rtrim($dir, '/'), '/'))."/&amp;C=$sort&amp;O=$order"?>">Parent Directory</a></td></tr>
 <?php
 foreach($list as $element){
 	get_properties($element['name'], $icon, $element['size']);
-	echo '<tr><td><input type="checkbox" name="files[]" value="'.htmlspecialchars($element['name'])."\"></td><td class=\"$icon\"></td><td><a href=\"files.php?path=$dir".str_replace('%2F', '/', rawurlencode($element['name'])).'">'.htmlspecialchars($element['name']).'</a></td><td>'.date("Y-m-d H:i", $element['mtime'])."</td><td>$element[size]</td></tr>";
+	echo '<tr><td><input type="checkbox" class="fileCheck" name="files[]" value="'.htmlspecialchars($element['name'])."\"></td><td class=\"$icon\"></td><td><a href=\"files.php?path=$dir".str_replace('%2F', '/', rawurlencode($element['name'])).'">'.htmlspecialchars($element['name']).'</a></td><td>'.date("Y-m-d H:i", $element['mtime'])."</td><td>$element[size]</td></tr>";
 }
 ?>
 <tr><td colspan="4"><hr></td></tr>
@@ -323,6 +351,15 @@ foreach($list as $element){
 <input type="submit" name="edit" value="Edit">
 <input type="submit" name="unzip" value="Unzip"><br><br>
 </form>
+<script>
+document.getElementById('checkAllParent').innerHTML = '<input type="checkbox" onclick="toggle(this);">';
+function toggle(source) {
+  checkboxes = document.getElementsByClassName('fileCheck');
+  for(var i=0, n=checkboxes.length;i<n;i++) {
+    checkboxes[i].checked = source.checked;
+  }
+}
+</script>
 </body></html>
 <?php
 
@@ -411,6 +448,7 @@ function send_rename($dir){
 	echo '<meta name=viewport content="width=device-width, initial-scale=1">';
 	echo '</head><body>';
 	echo '<form action="files.php" method="post">';
+	echo '<input type="hidden" name="csrf_token" value="'.$_SESSION['csrf_token'].'">';
 	echo '<input type="hidden" name="path" value="'.htmlspecialchars($dir).'">';
 	echo '<table>';
 	foreach($_POST['files'] as $file){
@@ -429,6 +467,7 @@ function send_edit($ftp, $dir){
 	echo '<meta name=viewport content="width=device-width, initial-scale=1">';
 	echo '</head><body>';
 	echo '<form action="files.php" method="post">';
+	echo '<input type="hidden" name="csrf_token" value="'.$_SESSION['csrf_token'].'">';
 	echo '<input type="hidden" name="path" value="'.htmlspecialchars($dir).'">';
 	echo '<table>';
 	$tmpfile='/tmp/'.uniqid();

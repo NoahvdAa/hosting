@@ -102,6 +102,7 @@ BINARIES_GENERAL=(
     '/usr/bin/unzip'
     '/usr/bin/curl'
     '/usr/bin/rsync'
+    '/usr/bin/scp'
     '/usr/bin/wget'
     '/usr/bin/php7.3'
     '/usr/bin/mysql'
@@ -153,6 +154,12 @@ DIRECTORIES_GENERAL=(
 )
 ### test variables/parameters
 test "$CHROOT_DIRECTORY" != ""
+
+if [ "$2" != "" ]; then
+    CHROOT_BINARY $2
+    echo "copied extra binary $2";
+    exit 0;
+fi
 
 ### init chroot directory
 mkdir -p $CHROOT_DIRECTORY
